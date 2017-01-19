@@ -1,0 +1,21 @@
+{
+  "name": "@retailmenot/groundhar-day",
+  "version": "1.0.0",
+  "description": "Given a HAR, recreate its original network environment",
+  "dependencies": {
+    "express": "^4.14.0",
+    "ip": "^1.1.4",
+    "ip-address": "^5.8.6",
+    "spdy": "^3.4.4",
+    "yargs": "^6.6.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "RMN Engineering",
+  "contributors": [
+    "Lon Ingram <lawnsea@gmail.com>"
+  ],
+  "license": "MIT"
+}
