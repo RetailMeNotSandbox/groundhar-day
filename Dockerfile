@@ -49,6 +49,7 @@ COPY ca /opt/ca/
 RUN touch /opt/ca/index.txt && echo '1000' > /opt/ca/serial
 
 COPY src /opt/src/
+COPY examples /opt/examples/
 
 USER root
 WORKDIR /opt/src
