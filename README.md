@@ -11,19 +11,23 @@ different optimization ideas.
 ## Quick start
 
 1. Build and run the Docker image
+
   ```sh
   docker build -t groundhar-day .
   docker run --privileged -it -p 9222:9222 --dns 192.168.1.100 groundhar-day
   ```
 2. In the container, generate a configuration file from a HAR
+
   ```sh
   ./generate-mininet-config.js /opt/examples/lawnsea.com.har
   ```
 3. Create the simulated environment
+
   ```sh
   ./start-mininet.py --config mininet-config.json
   ```
 4. Run headless Chrome in the container
+
   ```
   docker exec -it <the name or hash of the running container> google-chrome-unstable --headless --disable-gpu --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0 --window-size=412,732
   ```
