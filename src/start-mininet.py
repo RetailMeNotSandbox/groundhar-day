@@ -1,7 +1,9 @@
 #!/usr/bin/python
 
 import argparse
+import errno
 import json
+import os
 import re
 import subprocess
 from urlparse import urlparse
@@ -20,6 +22,12 @@ parser.add_argument(
   type=str,
   default='/etc/opt/mininet-config.json',
   help='configuration file'
+)
+parser.add_argument(
+  '--logs-dir',
+  type=str,
+  default='/var/logs/groundhar-day',
+  help='directory to write log files in'
 )
 parser.add_argument(
   '--bandwidth',
@@ -51,6 +59,15 @@ harnet = None
 
 with open(args.config) as data_file:    
   config = json.load(data_file)
+
+# http://stackoverflow.com/a/600612
+try:
+  os.makedirs(args.logs_dir)
+except OSError as exc:  # Python >2.5
+  if exc.errno == errno.EEXIST and os.path.isdir(args.logs_dir):
+    pass
+  else:
+    raise
 
 class LinuxRouter( Node ):
   "A Node with IP forwarding enabled."
@@ -101,7 +118,7 @@ def initializeNet():
   router = net.get('router')
 
   net.get('dns').cmd(
-    'dnsmasq -R -h -H /opt/src/hosts --log-facility=/var/log/har/dns'
+    'dnsmasq -R -h -H /opt/src/hosts --log-facility=/{}/dns'.format(args.logs_dir)
   )
 
   # connect root namespace
@@ -173,7 +190,7 @@ def initializeNet():
     host.setDefaultRoute('dev eth0 via {}'.format(gateway))
 
     # run the host command
-    cmd = '{} >/var/log/har/{} 2>&1 &'.format(config[origin]['cmd'], name)
+    cmd = '{} >/{}/{} 2>&1 &'.format(config[origin]['cmd'], args.logs_dir, name)
     print 'Running command for {}\n{}'.format(name, cmd)
     host.cmd(cmd)
     
