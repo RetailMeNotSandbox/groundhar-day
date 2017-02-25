@@ -1,0 +1,27 @@
+#! /usr/bin/node
+/* vim: set ft=javascript: */
+
+'use strict';
+
+const server = require('../src/server');
+
+const argv = require('yargs')
+  .describe('p', 'the port to listen on')
+    .default('p', 9000)
+    .alias('p', 'port')
+    .nargs('p', 1)
+  .describe('a', 'the IP address to listen on')
+    .default('a', '192.168.2.2')
+    .alias('a', 'address')
+    .nargs('address', 1)
+  .help('h')
+  .alias('h', 'help')
+  .argv;
+
+server.listen(argv.port, argv.address);
+console.log(`Listening on ${argv.address}:${argv.port}`);
+
+server.on('error', err => {
+  console.error(`Server error: ${err}`);
+  process.exit(1);
+});

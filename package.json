@@ -3,10 +3,18 @@
   "version": "1.0.0",
   "description": "Given a HAR, recreate its original network environment",
   "dependencies": {
+    "async": "^2.1.5",
+    "body-parser": "^1.17.0",
     "express": "^4.14.0",
+    "get-stdin": "^5.0.1",
     "ip": "^1.1.4",
     "ip-address": "^5.8.6",
+    "mkdirp": "^0.5.1",
+    "node-cleanup": "^2.1.2",
+    "request": "^2.79.0",
+    "rimraf": "^2.6.1",
     "spdy": "^3.4.4",
+    "string-to-stream": "^1.1.0",
     "yargs": "^6.6.0"
   },
   "devDependencies": {},

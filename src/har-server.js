@@ -3,6 +3,7 @@
 const argv = require('yargs').argv;
 const child_process = require('child_process');
 const express = require('express');
+const getStdin = require('get-stdin');
 const http = require('http');
 const https = require('https');
 const http2 = require('spdy');
@@ -13,18 +14,22 @@ const zlib = require('zlib');
 
 console.log(`argv ${JSON.stringify(argv, null, 2)}`);
 
-if (argv._.length !== 3) {
-  console.error(`Expected a HAR filename and host. Got ${argv._}`);
+if (argv._.length !== 2) {
+  console.error(`Expected an origin and comma-delimited list of IPs. Got ${argv._}`);
   process.exit(1);
 }
-const [harFilename, origin, ipList] = argv._;
+  // XXX: You are here
+  // 
+  // It's possible for multiple origins to be served from the same IP, so
+  // - pass a comma-delimited list to har-server.js
+  // - har-server should generate certs that cover all hostnames the server
+  //   answers
+const [origins, ipList] = argv._;
+const origin = origins.split(',')[0];
 const {host, protocol, hostname, port} = url.parse(origin);
 const ips = ipList.split(',');
 
 let responses;
-
-console.log(`Reading ${path.resolve(harFilename)}`);
-const har = JSON.parse(fs.readFileSync(harFilename, 'utf8'));
 
 // find and preprocess all responses for this host
 function getResponses() {
@@ -47,6 +52,7 @@ function getResponses() {
 
       const response = Object.assign({}, entry.response);
 
+      response.content = response.content || {};
       if (response.content.size) {
         // convert the text into a buffer
         response.content.encoding = response.content.encoding || 'utf8';
@@ -73,18 +79,18 @@ function getResponses() {
   return responses;
 }
 
-responses = getResponses();
-
 const app = express();
 app.disable('x-powered-by');
 
 // register control route
 const connections = new Set();
 app.put('/__har_server/reset', (req, res, next) => {
-  connections.forEach(socket => socket.end());
+  console.log('RESET!');
   responses = getResponses();
+  console.log(responses);
   res.status(204);
   res.send();
+  connections.forEach(socket => socket.end());
 });
 
 // register route
@@ -140,46 +146,83 @@ function onConnection(socket) {
 }
 
 console.log(`Starting servers for ${origin}...`);
-ips.forEach(ip => {
-  let server;
 
-  if (protocol === 'http:') {
-    server = http.createServer(app);
-    server.on('connection', onConnection);
-    server.listen(port, ip);
-  } else if (protocol === 'https:') {
-    // create a cert for this host if one does not exist
-    const keyFilename = `${hostname}.key`;
-    const certFilename = `${hostname}.cert`;
+const certificates = new Map();
+function getApexDomain() {
+  console.log(`Getting apex domain of ${hostname}`);
+  return hostname.split('.').slice(-2).join('.');
+}
 
-    if (!fs.existsSync(keyFilename) || !fs.existsSync(certFilename)) {
-      console.log(`No key or cert for ${hostname}. Creating...`);
+function getKeyAndCert(origin) {
+  const keyFilename = `/opt/ca/server-store/${origin}.key`;
+  const csrFilename = `/opt/ca/server-store/${origin}.csr`;
+  const certFilename = `/opt/ca/server-store/${origin}.cert`;
 
-      // create the csr and key
-      let cmd = `openssl req -nodes -newkey rsa:2048 -keyout ${keyFilename} -out ${hostname}.csr -subj "/CN=${hostname}"`;
-      console.log(cmd);
-      child_process.execSync(cmd);
+  if (!certificates.has(origin)) {
+    let key, cert;
 
-      // create the cert
-      cmd = `openssl ca -batch -config /opt/ca/openssl.cnf -extensions server_cert -days 375 -notext -md sha256 -in ${hostname}.csr -out ${certFilename}`;
-      console.log(cmd);
-      child_process.execSync(cmd);
-
-      console.log('Done');
+    try {
+      key = fs.readFileSync(keyFilename);
+      cert = fs.readFileSync(certFilename);
+    } catch (e) {
+      if (e.code !== 'ENOENT') {
+        throw e;
+      }
     }
 
-    server = (argv.http2 ? http2 : https).createServer({
-          key: fs.readFileSync(keyFilename),
-          cert: fs.readFileSync(certFilename)
-        },
-        app
-      );
-    server.on('connection', onConnection);
-    server.listen(port, ip);
-  } else {
-    throw new Error(`Cannot support protocol '${protocol}'`);
+    if (!key) {
+      const cmd = `openssl req -config /opt/ca/openssl.cnf -nodes -newkey rsa:2048 -keyout ${keyFilename} -out ${csrFilename} -subj "/CN=${origin}"`;
+      console.log(`Creating key for ${origin}\n${cmd}`);
+      child_process.execSync(cmd, {
+        env: {
+          SAN: `DNS:${origin}`
+        }
+      });
+      key = fs.readFileSync(keyFilename);
+    }
+
+    if (!cert) {
+      cmd = `openssl ca -batch -config /opt/ca/openssl.cnf -extensions server_cert -days 375 -notext -md sha256 -in ${csrFilename} -out ${certFilename}`;
+      console.log(cmd);
+      console.log(`Creating cert for ${origin}\n${cmd}`);
+      child_process.execSync(cmd, {
+        env: {
+          SAN: `DNS:${origin}`
+        }
+      });
+      cert = fs.readFileSync(certFilename);
+    }
+
+    certificates.set(origin, { key, cert });
   }
 
-  console.log(`Listening on ${ip}:${port}`);
+  return certificates.get(origin);
+}
+
+let har;
+getStdin().then(harStr => {
+  har = JSON.parse(harStr);
+  responses = getResponses();
+
+  ips.forEach(ip => {
+    let server;
+
+    if (protocol === 'http:') {
+      server = http.createServer(app);
+      server.on('connection', onConnection);
+      server.listen(port, ip);
+    } else if (protocol === 'https:') {
+      server = (argv.http2 ? http2 : https).createServer(
+          getKeyAndCert(hostname),
+          app
+        );
+      server.on('connection', onConnection);
+      server.listen(port, ip);
+    } else {
+      throw new Error(`Cannot support protocol '${protocol}'`);
+    }
+
+    console.log(`Listening on ${ip}:${port}`);
+  });
+  console.log('Done');
 });
-console.log('Done');

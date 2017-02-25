@@ -100,6 +100,7 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer:always
 keyUsage = critical, digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth
+subjectAltName=${ENV::SAN}
 
 [ crl_ext ]
 # Extension for CRLs (`man x509v3_config`).
@@ -112,3 +113,6 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer
 keyUsage = critical, digitalSignature
 extendedKeyUsage = critical, OCSPSigning
+
+[ san_env ]
+subjectAltName=${ENV::SAN}

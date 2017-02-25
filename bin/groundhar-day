@@ -1,0 +1,129 @@
+#! /usr/bin/node
+/* vim: set ft=javascript: */
+
+'use strict';
+
+const child_process = require('child_process');
+const mkdirp = require('mkdirp');
+const nodeCleanup = require('node-cleanup');
+const {
+    createNamespace,
+    execInNamespace,
+    createVethPair
+  } = require('../src/util');
+
+const argv = require('yargs')
+  .describe('p', 'the port to listen on')
+    .default('p', 9000)
+    .alias('p', 'port')
+    .nargs('p', 1)
+  .describe('a', 'the IP address to listen on')
+    .default('a', '192.168.2.2')
+    .alias('a', 'address')
+    .nargs('address', 1)
+  .help('h')
+  .alias('h', 'help')
+  .argv;
+
+let server = null;
+nodeCleanup((exitCode, signal) => {
+  if (server) {
+    server.kill();
+  }
+
+  try {
+    child_process.execSync('ip netns del ghd-cl');
+  } catch (e) {
+    console.error(`Could not delete network namespace:\n${e.stack}`);
+  }
+
+  try {
+    child_process.execSync('ip netns del ghd-net');
+  } catch (e) {
+    console.error(`Could not delete network namespace:\n${e.stack}`);
+  }
+});
+
+mkdirp.sync('/var/log/groundhar-day');
+
+// create ghd-cl namespace
+createNamespace('ghd-cl', {
+  etc: {
+    'resolv.conf': 'nameserver 192.168.1.100\n'
+  }
+});
+
+// create veth pair and link default namespace
+// FIXME: control server IP address should be configurable
+[
+  'ip link add ghd-up type veth peer name ghd-default',
+  'ip link set ghd-default netns ghd-cl',
+  'ifconfig ghd-up 192.168.2.1/24 up'
+].forEach(cmd => child_process.execSync(cmd));
+execInNamespace(
+  'ghd-cl',
+  'ifconfig ghd-default 192.168.2.2/24 up'
+);
+
+// connect virtualbox internal network
+// FIXME: interface and ip should be configurable
+child_process.execSync('ip link set enp0s8 netns ghd-cl');
+execInNamespace(
+  'ghd-cl',
+  'ifconfig enp0s8 192.168.42.1/24 up'
+);
+
+// spawn chrome and connect to VM port
+const chrome = child_process.spawn(
+  'ip',
+  'netns exec ghd-cl google-chrome-unstable --disable-gpu --headless --remote-debugging-address=192.168.2.2 --remote-debugging-port=9222 --window-size=412,732'.split(' '),
+  {
+    stdio: 'inherit'
+  }
+);
+
+chrome.on('error', (err) => {
+  console.error(`Failed to start chrome: ${err}`);
+  process.exit(1);
+});
+
+const chromeSocat = child_process.spawn(
+  'socat',
+  'tcp-listen:9222,reuseaddr,fork tcp-connect:192.168.2.2:9222'.split(' '),
+  {
+    stdio: 'inherit'
+  }
+);
+
+chromeSocat.on('error', (err) => {
+  console.error(`Failed to start socat for chrome: ${err}`);
+  process.exit(1);
+});
+
+
+// start server
+server = child_process.spawn(
+  'ip',
+  `netns exec ghd-cl ${__dirname}/start-server -p ${argv.port} -a ${argv.address}`.split(' '),
+  {
+    stdio: 'inherit'
+  }
+);
+
+server.on('error', (err) => {
+  console.error(`Failed to start server: ${err}`);
+  process.exit(1);
+});
+
+const serverSocat = child_process.spawn(
+  'socat',
+  'tcp-listen:9000,reuseaddr,fork tcp-connect:192.168.2.2:9000'.split(' '),
+  {
+    stdio: 'inherit'
+  }
+);
+
+serverSocat.on('error', (err) => {
+  console.error(`Failed to start socat for server: ${err}`);
+  process.exit(1);
+});
