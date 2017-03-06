@@ -9,10 +9,10 @@ Vagrant.configure("2") do |config|
     v.cpus = 4
   end
 
-  # Create a forwarded port mapping which allows access to a specific port
-  # within the machine from a port on the host machine. In the example below,
-  # accessing "localhost:8080" will access port 80 on the guest machine.
+  # forward port for Chrome devtools
   config.vm.network "forwarded_port", guest: 9222, host: 9222
+
+  # forward port for GroundHAR Day server
   config.vm.network "forwarded_port", guest: 9000, host: 9000
 
   # Connect to the GroundHAR Day VirtualBox internal network

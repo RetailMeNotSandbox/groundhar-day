@@ -10,28 +10,22 @@ different optimization ideas.
 
 ## Quick start
 
-1. Build and run the Docker image
+### Prerequisites
 
+* [VirtualBox][]
+* [Vagrant][]
+
+1. Provision the VM
   ```sh
-  docker build -t groundhar-day .
-  docker run --privileged -it -p 9222:9222 --dns 192.168.1.100 groundhar-day
+  vagrant up
   ```
-2. In the container, generate a configuration file from a HAR
-
+2. Upload a HAR to replay
   ```sh
-  ./generate-mininet-config.js /opt/examples/lawnsea.com.har
+  FIXME
   ```
-3. Create the simulated environment
-
-  ```sh
-  ./start-mininet.py --config mininet-config.json
-  ```
-4. Run headless Chrome in the container
-
-  ```
-  docker exec -it <the name or hash of the running container> google-chrome-unstable --headless --disable-gpu --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0 --window-size=412,732
-  ```
-5. Open http://localhost:9222 in your browser and click on "about:blank"
-6. Type `http://lawnsea.com` into the headless browser's URL bar
+3. Open http://localhost:9222 in your browser and click on "about:blank"
+4. Type `http://lawnsea.com` into the headless browser's URL bar
 
 [HAR]: http://www.softwareishard.com/blog/har-12-spec/
+[Vagrant]: https://www.vagrantup.com/downloads.html
+[VirtualBox]: https://www.virtualbox.org/wiki/Downloads
