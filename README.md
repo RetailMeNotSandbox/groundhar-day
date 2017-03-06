@@ -16,13 +16,17 @@ different optimization ideas.
 * [Vagrant][]
 
 1. Provision the VM
+
   ```sh
   vagrant up
   ```
+
 2. Upload a HAR to replay
+
   ```sh
   FIXME
   ```
+
 3. Open http://localhost:9222 in your browser and click on "about:blank"
 4. Type `http://lawnsea.com` into the headless browser's URL bar
 
