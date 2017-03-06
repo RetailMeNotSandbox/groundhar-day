@@ -261,55 +261,6 @@ Environment.prototype.initialize = function () {
     i++;
   }
 
-  /*
-  Array.from(this._ipsByOrigin).forEach(([origin, originIps], i) => {
-    const originPrefix = `ghd-o${i}`;
-    console.log(origin, originIps);
-
-    // for each ip for the origin
-    // create a veth pair in ghd-net
-    const ips = Array.from(originIps);
-    console.log('creating interfaces for', ips);
-    ips.forEach((originIp, i) => {
-      const hostPrefix = `${originPrefix}h${i}`;
-      createVethPair('ghd-net', hostPrefix);
-      [
-        // connect one to the bridge
-        `ip link set ${hostPrefix}-net up`,
-        `ip link set ${hostPrefix}-net master ghd-br`,
-        // assign the ip to the other
-        `ifconfig ${hostPrefix}-cl ${originIp}/32 up`
-      ].forEach(cmd => execInNamespace('ghd-net', cmd));
-    });
-
-    console.log(`spawning ${['ip', 'netns', 'exec', './har-server.js', origin, ips.join(',')].join(' ')}`);
-    const logFile = fs.openSync(
-      `/var/log/groundhar-day/${origin.replace(/[^0-9a-zA-Z]+/g, '_')}`,
-      'w'
-    );
-    const child = child_process.spawn(
-      'ip',
-      [
-        'netns', 'exec', 'ghd-net', './har-server.js', origin, ips.join(','),
-      ],
-      {
-        stdio: ['pipe', logFile, logFile]
-      }
-    );
-    servers.add(child);
-
-    child.on('close', (code) => {
-      console.log(`har-server.js for ${origin} exited with code ${code}`);
-    });
-
-    child.on('error', err => {
-      console.error(`har-server.js for ${origin} error: ${err}`);
-      process.exit(1);
-    });
-    stringToStream(JSON.stringify(this._har)).pipe(child.stdin);
-  });
-  */
-
   // add a route back to the virtualbox internal network
   // FIXME: this should be configurable
   execInNamespace(
