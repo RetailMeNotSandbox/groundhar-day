@@ -21,14 +21,23 @@ different optimization ideas.
   vagrant up
   ```
 
-2. Upload a HAR to replay
+2. Start the GroundHAR Day server
 
   ```sh
-  FIXME
+  vagrant ssh
+  # then, from the Vagrant ssh session:
+  cd /opt/groundhar-day/src
+  sudo ../bin/groundhar-day
   ```
 
-3. Open http://localhost:9222 in your browser and click on "about:blank"
-4. Type `http://lawnsea.com` into the headless browser's URL bar
+3. Upload a HAR to replay
+
+  ```sh
+  curl -H "Content-Type: application/json" --data-binary @./examples/lawnsea.com.har -X PUT http://localhost:9000/har
+  ```
+
+4. Open http://localhost:9222 in your browser and click on "about:blank"
+5. Type `http://lawnsea.com` into the headless browser's URL bar
 
 [HAR]: http://www.softwareishard.com/blog/har-12-spec/
 [Vagrant]: https://www.vagrantup.com/downloads.html
