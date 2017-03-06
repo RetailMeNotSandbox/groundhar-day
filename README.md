@@ -36,8 +36,13 @@ different optimization ideas.
   curl -H "Content-Type: application/json" --data-binary @./examples/lawnsea.com.har -X PUT http://localhost:9000/har
   ```
 
-4. Open http://localhost:9222 in your browser and click on "about:blank"
+4. Open [http://localhost:9222](http://localhost:9222) in your browser and click on "about:blank"
 5. Type `http://lawnsea.com` into the headless browser's URL bar
+6. Reset the simulation for another replay
+
+  ```sh
+  curl http://localhost:9000/reset
+  ```
 
 [HAR]: http://www.softwareishard.com/blog/har-12-spec/
 [Vagrant]: https://www.vagrantup.com/downloads.html
