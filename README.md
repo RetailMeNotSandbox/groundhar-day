@@ -3,10 +3,10 @@
 GroundHAR Day is a tool for doing rapid, reproducible performance experiments.
 
 Given an HTTP Archive - or [HAR][] - GroundHAR Day simulates the observed
-network environment inside a Docker container. This makes it possible to replay
-the captured page load under different network conditions. More interestingly,
-the HAR content can be edited directly to quickly and rigorously evaluate
-different optimization ideas.
+network environment inside a VirtualBox VM. This makes it possible to replay the
+captured page load under different network conditions. More interestingly, the
+HAR content can be edited directly to quickly and rigorously evaluate different
+optimization ideas.
 
 ## Quick start
 
