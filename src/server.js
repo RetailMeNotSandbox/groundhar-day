@@ -41,10 +41,16 @@ app.put('/har', (req, res, next) => {
  */
 // FIXME: this should just proxy the request into the environment
 app.get('/reset', (req, res, next) => {
+  if (!env) {
+    res.status(400);
+    res.send('There is no active HAR\n');
+    return;
+  }
+
   try {
     env.reset();
-    res.status(204);
-    res.send();
+    res.status(200);
+    res.send('All servers reset\n');
   } catch (e) {
     next(e);
   }
