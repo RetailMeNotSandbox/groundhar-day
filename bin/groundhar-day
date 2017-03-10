@@ -9,7 +9,8 @@ const nodeCleanup = require('node-cleanup');
 const {
     createNamespace,
     execInNamespace,
-    createVethPair
+    createVethPair,
+    deleteVethPair
   } = require('../src/util');
 
 const argv = require('yargs')
@@ -29,6 +30,21 @@ let server = null;
 nodeCleanup((exitCode, signal) => {
   if (server) {
     server.kill();
+  }
+
+  try {
+    execInNamespace(
+      'ghd-cl',
+      'ip link set enp0s8 netns 1'
+    );
+  } catch (e) {
+    console.error(`Could not move enp0s8 to default namespace:\n${e.stack}`);
+  }
+
+  try {
+    child_process.execSync('ip link del ghd-up');
+  } catch (e) {
+    console.error(`Could not delete ghd-up/default veth pair:\n${e.stack}`);
   }
 
   try {
@@ -72,20 +88,6 @@ execInNamespace(
   'ghd-cl',
   'ifconfig enp0s8 192.168.42.1/24 up'
 );
-
-// spawn chrome and connect to VM port
-const chrome = child_process.spawn(
-  'ip',
-  'netns exec ghd-cl google-chrome-unstable --disable-gpu --headless --remote-debugging-address=192.168.2.2 --remote-debugging-port=9222 --window-size=412,732'.split(' '),
-  {
-    stdio: 'inherit'
-  }
-);
-
-chrome.on('error', (err) => {
-  console.error(`Failed to start chrome: ${err}`);
-  process.exit(1);
-});
 
 const chromeSocat = child_process.spawn(
   'socat',

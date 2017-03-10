@@ -9,8 +9,24 @@ const rimraf = require('rimraf');
 const stringToStream = require('string-to-stream');
 const url = require('url');
 
+const {
+    createNamespace,
+    execInNamespace,
+    createVethPair,
+    deleteVethPair
+  } = require('./util');
+
+let chromeChild;
 const servers = new Set;
-nodeCleanup((exitCode, signal) => {
+function teardown() {
+  if (chromeChild) {
+    try {
+      chromeChild.kill();
+    } catch (e) {
+      console.error(`Could not kill chrome: ${e}`);
+    }
+  }
+
   for (let server of servers) {
     try {
       server.kill();
@@ -18,13 +34,23 @@ nodeCleanup((exitCode, signal) => {
       console.error(`Could not kill ${server}: ${e}`);
     }
   }
-});
 
-const {
-    createNamespace,
-    execInNamespace,
-    createVethPair
-  } = require('./util');
+  try {
+    deleteVethPair('ghd-net', 'ghd');
+  } catch (e) {
+    console.error(`Could not delete ghd-cl/net veth pair:\n${e.stack}`);
+  }
+
+  try {
+    child_process.execSync('ip netns del ghd-net');
+  } catch (e) {
+    console.error(`Could not delete network namespace:\n${e.stack}`);
+  }
+}
+
+nodeCleanup((exitCode, signal) => {
+  teardown();
+});
 
 
 function Environment(har) {
@@ -130,7 +156,7 @@ function createHost(namespace, host, ip, hostCmd) {
   });
 
   child.on('close', (code) => {
-    console.log(`child child exited with code ${code}`);
+    console.log(`${hostCmd} exited with code ${code}`);
   });
 
   child.on('error', err => {
@@ -267,7 +293,25 @@ Environment.prototype.initialize = function () {
     'ghd-net',
     'ip route add 192.168.42.0/24 via 192.168.1.1'
   );
+
+  this._startChrome();
 }
+
+Environment.prototype._startChrome = function () {
+  // spawn chrome and connect to VM port
+  chromeChild = child_process.spawn(
+    'ip',
+    'netns exec ghd-cl google-chrome-unstable --disable-gpu --headless --remote-debugging-address=192.168.2.2 --remote-debugging-port=9222 --window-size=412,732'.split(' '),
+    {
+      stdio: 'inherit'
+    }
+  );
+
+  chromeChild.on('error', (err) => {
+    console.error(`Failed to start chrome: ${err}`);
+    process.exit(1);
+  });
+};
 
 /**
  * Reset all origin servers
@@ -275,6 +319,7 @@ Environment.prototype.initialize = function () {
 Environment.prototype.reset = function () {
   const originsReset = [];
 
+  this._startChrome();
   Array.from(this._ipsByOrigin).forEach(([origin, originIps]) => {
     if (originIps.length < 1) {
       return;
@@ -290,7 +335,6 @@ Environment.prototype.reset = function () {
   return originsReset;
 };
 
-Environment.prototype.teardown = function () {
-};
+Environment.prototype.teardown = teardown;
 
 module.exports = Environment;

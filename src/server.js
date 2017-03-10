@@ -27,6 +27,10 @@ app.use(bodyParser.json({ limit: '100mb' }));
  */
 app.put('/har', (req, res, next) => {
   try {
+    if (env) {
+      env.teardown();
+    }
+
     env = new Environment(req.body);
     env.initialize();
     res.status(201);

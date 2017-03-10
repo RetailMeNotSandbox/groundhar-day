@@ -18,12 +18,7 @@ if (argv._.length !== 2) {
   console.error(`Expected an origin and comma-delimited list of IPs. Got ${argv._}`);
   process.exit(1);
 }
-  // XXX: You are here
-  // 
-  // It's possible for multiple origins to be served from the same IP, so
-  // - pass a comma-delimited list to har-server.js
-  // - har-server should generate certs that cover all hostnames the server
-  //   answers
+
 const [origins, ipList] = argv._;
 const origin = origins.split(',')[0];
 const {host, protocol, hostname, port} = url.parse(origin);

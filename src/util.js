@@ -42,8 +42,16 @@ function createVethPair(namespace, prefix) {
   );
 }
 
+function deleteVethPair(namespace, prefix) {
+  execInNamespace(
+    namespace,
+    `ip link delete ${prefix}-net`
+  );
+}
+
 module.exports = {
   createNamespace,
   execInNamespace,
-  createVethPair
+  createVethPair,
+  deleteVethPair
 };
