@@ -171,7 +171,7 @@ function getKeyAndCert(origin) {
     }
 
     if (!key) {
-      const cmd = `openssl req -config /opt/ca/openssl.cnf -nodes -newkey rsa:2048 -keyout ${keyFilename} -out ${csrFilename} -subj "/CN=${origin}"`;
+      const cmd = `openssl req -extensions san_env -config /opt/ca/openssl.cnf -nodes -newkey rsa:2048 -keyout ${keyFilename} -out ${csrFilename} -subj "/CN=${origin}"`;
       console.log(`Creating key for ${origin}\n${cmd}`);
       child_process.execSync(cmd, {
         env: {
