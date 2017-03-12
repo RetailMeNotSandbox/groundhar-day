@@ -27,7 +27,8 @@ optimization ideas.
   vagrant ssh
   # then, from the Vagrant ssh session:
   cd /opt/groundhar-day/src
-  sudo ../bin/groundhar-day
+  sudo su
+  ../bin/groundhar-day
   ```
 
 3. Upload a HAR to replay
