@@ -49,9 +49,17 @@ function deleteVethPair(namespace, prefix) {
   );
 }
 
+function toOrigin(parsedUrl) {
+  const port = parsedUrl.port ||
+    parsedUrl.protocol === 'https:' ? '443' : '80';
+
+  return `${parsedUrl.protocol}//${parsedUrl.hostname}:${port}`;
+}
+
 module.exports = {
   createNamespace,
   execInNamespace,
   createVethPair,
-  deleteVethPair
+  deleteVethPair,
+  toOrigin
 };

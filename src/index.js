@@ -13,7 +13,8 @@ const {
     createNamespace,
     execInNamespace,
     createVethPair,
-    deleteVethPair
+    deleteVethPair,
+    toOrigin
   } = require('./util');
 
 let chromeChild;
@@ -56,8 +57,6 @@ nodeCleanup((exitCode, signal) => {
 function Environment(har) {
   this._har = har;
   this._hosts = new Map();
-  this._ipsByOrigin = new Map();
-  this._originsByIp = new Map();
   this._servers = new Map();
 
   har.log.entries.forEach(entry => {
@@ -68,9 +67,7 @@ function Environment(har) {
       return;
     }
 
-    const port = entryUrl.port ||
-      entryUrl.protocol === 'https:' ? '443' : '80';
-    const origin = `${entryUrl.protocol}//${entryUrl.hostname}:${port}`;
+    const origin = toOrigin(entryUrl);
 
     const ipServer = this._servers.get(serverIp);
     const originServer = this._servers.get(origin);
@@ -79,34 +76,50 @@ function Environment(har) {
       // no server exists for this ip/origin pair, create one
       const server = {
         ips: new Set([serverIp]),
-        origins: new Set([origin])
+        origins: new Set([origin]),
+        instances: new Set(),
+        entries: []
       };
       this._servers.set(serverIp, server);
       this._servers.set(origin, server);
-    } else if (ipServer === originServer) {
-      // we already have a server for this ip/origin pair
-      return;
-    } else if (!ipServer) {
-      // new ip for this origin
-      originServer.ips.add(serverIp);
-      this._servers.set(serverIp, originServer);
-    } else if (!originServer) {
-      // new origin for this ip
-      ipServer.origins.add(origin);
-      this._servers.set(origin, ipServer);
-    } else {
-      // different servers exist for this origin and ip, so merge them by moving
-      // all of the origins and ips from the origin server into the ip server
-      for (let ip of originServer.ips) {
-        ipServer.ips.add(ip);
-        this._server.set(ip, ipServer);
-      }
+    } else if (ipServer !== originServer) {
+      // we don't have an ip/origin pair
 
-      for (let origin of originServer.origins) {
+      if (!ipServer) {
+        // new ip for this origin
+        originServer.ips.add(serverIp);
+        this._servers.set(serverIp, originServer);
+      } else if (!originServer) {
+        // new origin for this ip
         ipServer.origins.add(origin);
-        this._server.set(origin, ipServer);
+        this._servers.set(origin, ipServer);
+      } else {
+        // different servers exist for this origin and ip, so merge them by
+        // moving all of the origins and ips from the origin server into the ip
+        // server
+        for (let ip of originServer.ips) {
+          ipServer.ips.add(ip);
+          this._servers.set(ip, ipServer);
+        }
+
+        for (let origin of originServer.origins) {
+          ipServer.origins.add(origin);
+          this._servers.set(origin, ipServer);
+        }
       }
     }
+
+    const parsedOrigin = url.parse(origin);
+
+    const server = this._servers.get(serverIp);
+    server.entries.push(entry);
+    server.instances.add(
+      url.format({
+        protocol: entryUrl.protocol,
+        hostname: serverIp,
+        port: url.parse(origin).port
+      })
+    );
 
     // map domain -> ip for building hosts file
     if (!this._hosts.has(entryUrl.hostname)) {
@@ -114,21 +127,9 @@ function Environment(har) {
       this._hosts.set(entryUrl.hostname, new Set());
     }
     this._hosts.get(entryUrl.hostname).add(serverIp);
-
-    if (!this._ipsByOrigin.has(origin)) {
-      this._ipsByOrigin.set(origin, new Set());
-    }
-    this._ipsByOrigin.get(origin).add(serverIp);
-
-    if (!this._originsByIp.has(serverIp)) {
-      this._originsByIp.set(serverIp, new Set());
-    }
-    this._originsByIp.get(serverIp).add(origin)
   });
 
   console.log(this._hosts);
-  console.log(this._ipsByOrigin);
-  console.log(this._originsByIp);
   console.log(this._servers);
 }
 
@@ -236,13 +237,13 @@ Environment.prototype.initialize = function () {
   let i = 0;
   for (let server of new Set(this._servers.values())) {
     console.log(server);
-    let origin = Array.from(server.origins)[0];
+    let origins = Array.from(server.origins);
     let originIps = server.ips
 
     const originPrefix = `ghd-o${i}`;
-    console.log(origin, originIps);
+    console.log(origins, originIps);
 
-    // for each ip for the origin
+    // for each ip for the origins
     // create a veth pair in ghd-net
     const ips = Array.from(originIps);
     console.log('creating interfaces for', ips);
@@ -258,16 +259,13 @@ Environment.prototype.initialize = function () {
       ].forEach(cmd => execInNamespace('ghd-net', cmd));
     });
 
-    console.log(`spawning ${['ip', 'netns', 'exec', './har-server.js', origin, ips.join(',')].join(' ')}`);
     const logFile = fs.openSync(
-      `/var/log/groundhar-day/${origin.replace(/[^0-9a-zA-Z]+/g, '_')}`,
+      `/var/log/groundhar-day/${origins[0].replace(/[^0-9a-zA-Z]+/g, '_')}`,
       'w'
     );
     const child = child_process.spawn(
       'ip',
-      [
-        'netns', 'exec', 'ghd-net', './har-server.js', origin, ips.join(','),
-      ],
+      ['netns', 'exec', 'ghd-net', './replay-server.js'],
       {
         stdio: ['pipe', logFile, logFile]
       }
@@ -275,14 +273,19 @@ Environment.prototype.initialize = function () {
     servers.add(child);
 
     child.on('close', (code) => {
-      console.log(`har-server.js for ${origin} exited with code ${code}`);
+      console.log(`har-server.js for ${origins} exited with code ${code}`);
     });
 
     child.on('error', err => {
-      console.error(`har-server.js for ${origin} error: ${err}`);
+      console.error(`har-server.js for ${origins} error: ${err}`);
       process.exit(1);
     });
-    stringToStream(JSON.stringify(this._har)).pipe(child.stdin);
+
+    // pass the HAR via stdin so we don't have to write it to disk
+    stringToStream(JSON.stringify({
+      instances: Array.from(server.instances),
+      entries: server.entries
+    })).pipe(child.stdin);
 
     i++;
   }
@@ -317,22 +320,15 @@ Environment.prototype._startChrome = function () {
  * Reset all origin servers
  */
 Environment.prototype.reset = function () {
-  const originsReset = [];
-
   this._startChrome();
-  Array.from(this._ipsByOrigin).forEach(([origin, originIps]) => {
-    if (originIps.length < 1) {
-      return;
-    }
+
+  for (let server of new Set(this._servers.values())) {
 
     execInNamespace(
       'ghd-cl',
-      `curl -X PUT ${origin}/__har_server/reset`
+      `curl -X PUT ${Array.from(server.origins)[0]}/__har_server/reset`
     );
-    originsReset.push(origin);
-  });
-
-  return originsReset;
+  }
 };
 
 Environment.prototype.teardown = teardown;
