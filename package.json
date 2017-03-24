@@ -10,6 +10,7 @@
     "ip": "^1.1.4",
     "ip-address": "^5.8.6",
     "mkdirp": "^0.5.1",
+    "moment": "^2.18.1",
     "node-cleanup": "^2.1.2",
     "request": "^2.79.0",
     "rimraf": "^2.6.1",

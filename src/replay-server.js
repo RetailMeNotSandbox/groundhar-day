@@ -3,11 +3,12 @@
 const argv = require('yargs').argv;
 const child_process = require('child_process');
 const express = require('express');
+const fs = require('fs');
 const getStdin = require('get-stdin');
 const http = require('http');
 const https = require('https');
 const http2 = require('spdy');
-const fs = require('fs');
+const moment = require('moment');
 const path = require('path');
 const url = require('url');
 const zlib = require('zlib');
@@ -28,6 +29,47 @@ function createPathRecord() {
     index: 0
   };
 }
+
+function isRfc1123Date(s) {
+  return moment(
+    s.replace(/GMT$/, 'Z'),
+    'ddd, DD MMM YYYY HH:mm:ss Z',
+    true
+  ).isValid();
+}
+
+function isRfc850Date(s) {
+  return moment(
+    s.replace(/GMT$/, 'Z'),
+    'dddd, DD-MMM-YY HH:mm:ss Z',
+    true
+  ).isValid();
+}
+
+function isAsctimeDate(s) {
+  // we have to check both with and without a leading space :/
+  return moment(s, 'ddd MMM D HH:mm:ss YYYY', true).isValid() ||
+    moment(s, 'ddd MMM  D HH:mm:ss YYYY', true).isValid();
+}
+
+function isHttpDate(s) {
+  // see https://tools.ietf.org/html/rfc2616#section-3.3.1
+  return isRfc1123Date(s) ||
+    isRfc850Date(s) ||
+    isAsctimeDate(s);
+}
+
+function TimeDelta(from, to) {
+  this.delta = (new Date(to)).getTime() - (new Date(from)).getTime();
+}
+
+TimeDelta.prototype.toRfc1123Date = function (when) {
+  when = when || Date.now();
+  when = (new Date(when)).getTime()
+
+  return moment(new Date(this.delta + when))
+    .format('ddd, DD MMM YYYY HH:mm:ss') + ' GMT';
+};
 
 const hostnamesByInstance = new Map();
 function processConfig(config) {
@@ -59,6 +101,13 @@ function processConfig(config) {
     const pathRecord = originRecord.paths.get(parsedUrl.path);
 
     const response = Object.assign({}, entry.response);
+
+    // convert all HTTP dates to TimeDeltas
+    for (let header of response.headers) {
+      if (isHttpDate(header.value)) {
+        header.value = new TimeDelta(entry.startedDateTime, header.value);
+      }
+    }
 
     response.content = response.content || {};
     if (response.content.size) {
@@ -110,6 +159,7 @@ app.all(['/', '/*'], (req, res, next) => {
     const reqUrl = url.parse(req.originalUrl);
     const reqOrigin =
       toOrigin(url.parse(`${req.protocol}://${req.headers.host}`));
+    const startedDateTime = Date.now();
 
     if (!responsesByOrigin.has(reqOrigin)) {
       throw new Error(
@@ -138,7 +188,13 @@ app.all(['/', '/*'], (req, res, next) => {
 
     // set all headers
     console.log(response.headers);
-    response.headers.forEach(header => res.set(header.name, header.value));
+    response.headers.forEach(header => {
+      if (header.value instanceof TimeDelta) {
+        res.set(header.name, header.value.toRfc1123Date(startedDateTime));
+      } else {
+        res.set(header.name, header.value);
+      }
+    });
     res.set('Content-Length', response.content.buffer.length);
 
     // send the buffer
