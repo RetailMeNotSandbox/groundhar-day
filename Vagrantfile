@@ -42,7 +42,4 @@ Vagrant.configure("2") do |config|
   # Install root CA certificate
   config.vm.provision "shell",
     path: "./vagrant/install-root-certificate.sh"
-
-  # Mount examples
-  config.vm.synced_folder "~/Projects/har/mnt", "/tmp/mnt"
 end

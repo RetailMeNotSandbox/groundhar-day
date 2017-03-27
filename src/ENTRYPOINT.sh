@@ -17,8 +17,6 @@
 #   Modifications are copyright 2017 RetailMeNot, Inc. and released under the
 #   terms of the MIT License
 
-chmod -R o+rw /tmp/mnt
-
 # remove default route
 ip route delete default
 
