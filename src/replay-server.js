@@ -16,6 +16,16 @@ const zlib = require('zlib');
 const toOrigin = require('./util').toOrigin;
 
 const responsesByOrigin = new Map();
+const httpsProtocolByVersion = {
+  'HTTP': https,
+  'HTTP/1.0': https,
+  'HTTP/1.1': https,
+  // Chrome reports HTTP/2 and SPDY as 'unknown'
+  // https://bugs.chromium.org/p/chromium/issues/detail?id=579002
+  'unknown': http2,
+  'SPDY': http2,
+  'HTTP/2': http2
+};
 
 function createOriginRecord() {
   return {
@@ -72,6 +82,7 @@ TimeDelta.prototype.toRfc1123Date = function (when) {
 };
 
 const hostnamesByInstance = new Map();
+const httpVersionsByInstance = new Map();
 function processConfig(config) {
   responsesByOrigin.clear();
 
@@ -89,6 +100,11 @@ function processConfig(config) {
       hostnamesByInstance.set(instance, new Set());
     }
     hostnamesByInstance.get(instance).add(parsedUrl.hostname);
+
+    if (!httpVersionsByInstance.has(instance)) {
+      console.log(`httpVersion: ${entry.response.httpVersion}`);
+      httpVersionsByInstance.set(instance, entry.response.httpVersion);
+    }
 
     if (!responsesByOrigin.has(origin)) {
       responsesByOrigin.set(origin, createOriginRecord());
@@ -234,8 +250,6 @@ function getKeyAndCert(instance) {
 
   console.log(`instance: ${instance}`);
   if (!certificates.has(instance)) {
-    console.log('got here');
-    console.log(hostnamesByInstance);
     const hostnames = Array.from(hostnamesByInstance.get(instance));
     console.log(`hostnames: ${hostnames}`);
     const SAN = hostnames.map(hostname => `DNS:${hostname}`).join(',');
@@ -287,14 +301,15 @@ getStdin().then(configStr => {
 
   config.instances.forEach(instance => {
     const {protocol, hostname, port} = url.parse(instance);
+    const httpVersion = httpVersionsByInstance.get(instance);
 
     if (protocol === 'http:') {
       server = http.createServer(app);
       server.on('connection', onConnection);
       server.listen(port, hostname);
     } else if (protocol === 'https:') {
-      console.log(`starting https server for ${instance}`);
-      server = (argv.http2 ? http2 : https).createServer(
+      console.log(`starting https (${httpVersion}) server for ${instance}`);
+      server = (httpsProtocolByVersion[httpVersion] || https).createServer(
           getKeyAndCert(instance),
           app
         );
