@@ -45,6 +45,35 @@ optimization ideas.
   curl http://localhost:9000/reset
   ```
 
+## Documentation
+
+### VM
+
+The VirtualBox VM is configured via environment variables in the shell where
+`vagrant up` is run.
+
+#### `GROUNDHAR_CPUS`
+
+The number of virtual CPUs the VM should have. Defaults to 4.
+
+#### `GROUNDHAR_DEVTOOLS_PORT`
+
+The port on the host where the Chrome DevTools is exposed. Defaults to 9222.
+
+#### `GROUNDHAR_MEMORY`
+
+The amount of memory in megabytes to reserve for the VM. Defaults to 2048.
+
+#### `GROUNDHAR_NETWORK_IP`
+
+The IP address of the VM on the `groundhar-day` [VirtualBox internal network][].
+
+#### `GROUNDHAR_SERVER_PORT`
+
+The port on the host where the GroundHAR Day server is exposed. Defaults to
+9000.
+
 [HAR]: http://www.softwareishard.com/blog/har-12-spec/
 [Vagrant]: https://www.vagrantup.com/downloads.html
 [VirtualBox]: https://www.virtualbox.org/wiki/Downloads
+[VirtualBox internal network]: https://www.virtualbox.org/manual/ch06.html#network_internal
