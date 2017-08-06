@@ -67,6 +67,7 @@ The amount of memory in megabytes to reserve for the VM. Defaults to 2048.
 #### `GROUNDHAR_NETWORK_IP`
 
 The IP address of the VM on the `groundhar-day` [VirtualBox internal network][].
+Defaults to 192.168.42.1.
 
 #### `GROUNDHAR_SERVER_PORT`
 
